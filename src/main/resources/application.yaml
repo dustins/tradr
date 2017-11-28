@@ -1,0 +1,23 @@
+tradr:
+  coinbase:
+    restUrl: "https://api-public.sandbox.gdax.com"
+    websocketUrl: "wss://ws-feed.gdax.com"
+    fixUrl: "https://fix-public.sandbox.gdax.com"
+
+security:
+  basic:
+    enabled: false
+
+spring:
+  jackson:
+    property-naming-strategy: SNAKE_CASE
+    default-property-inclusion: non_null
+    serialization: {
+      WRITE_NULL_MAP_VALUES: false
+    }
+
+logging:
+  level:
+    root: info
+    net.swigg.tradr: debug
+#    sun: warn

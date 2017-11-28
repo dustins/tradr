@@ -1,0 +1,44 @@
+{
+  "properties": {
+    "sequence": {
+      "type": "long"
+    },
+
+    "product_id": {
+      "type": "text",
+      "index": "not_analyzed"
+    },
+
+    "price": {
+      "type": "double"
+    },
+
+    "open_24h": {
+      "type": "double"
+    },
+
+    "volume_24h": {
+      "type": "double"
+    },
+
+    "low_24h": {
+      "type": "double"
+    },
+
+    "high_24h": {
+      "type": "double"
+    },
+
+    "volume_30d": {
+      "type": "double"
+    },
+
+    "best_bid": {
+      "type": "double"
+    },
+
+    "best_ask": {
+      "type": "double"
+    }
+  }
+}

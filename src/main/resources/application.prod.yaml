@@ -1,0 +1,5 @@
+tradr:
+  coinbase:
+    restUrl: "https://api.gdax.com"
+    websocketUrl: "wss://ws-feed-public.gdax.com"
+    fixUrl: "https://fix-public.gdax.com"
