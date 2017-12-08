@@ -1,44 +1,44 @@
 {
   "properties": {
-    "sequence": {
-      "type": "long"
+    "time": {
+      "type": "date",
+      "format": "yyyy-MM-dd HH:mm||epoch_millis",
+      "store": true
     },
 
-    "product_id": {
-      "type": "text",
-      "index": "not_analyzed"
+    "open": {
+      "type": "double",
+      "store": true
     },
 
-    "price": {
-      "type": "double"
+    "low": {
+      "type": "double",
+      "store": true
     },
 
-    "open_24h": {
-      "type": "double"
+    "high": {
+      "type": "double",
+      "store": true
     },
 
-    "volume_24h": {
-      "type": "double"
+    "close": {
+      "type": "double",
+      "store": true
     },
 
-    "low_24h": {
-      "type": "double"
+    "volume": {
+      "type": "double",
+      "store": true
     },
 
-    "high_24h": {
-      "type": "double"
+    "trades": {
+      "type": "long",
+      "store": true
     },
 
-    "volume_30d": {
-      "type": "double"
-    },
-
-    "best_bid": {
-      "type": "double"
-    },
-
-    "best_ask": {
-      "type": "double"
+    "amount": {
+      "type": "double",
+      "store": true
     }
   }
 }

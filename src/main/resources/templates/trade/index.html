@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8" />
+    <title>Tradr</title>
+</head>
+<body>
+    <div>
+        <form action="#" th:action="@{/trade}" th:object="${trade}" method="post">
+            <select th:field="*{side}">
+                <option th:each="type : ${T(net.swigg.tradr.trade.Trade.Side).values()}"
+                        th:value="${type}"
+                        th:text="${type}"></option>
+            </select>
+            <input type="number" pattern="\d++(\.\d+)?" th:field="*{price}" />
+            <input type="number" pattern="\d++(\.\d+)?" th:field="*{amount}" />
+            <button type="submit">Submit</button>
+        </form>
+    </div>
+</body>
+</html>

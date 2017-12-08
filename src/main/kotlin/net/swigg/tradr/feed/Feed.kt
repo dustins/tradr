@@ -1,62 +1,38 @@
 package net.swigg.tradr.feed
 
-import com.espertech.esper.client.EPServiceProvider
-import com.espertech.esper.client.time.CurrentTimeEvent
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.google.gson.Gson
 import com.google.gson.JsonObject
+import io.searchbox.client.JestClient
+import io.searchbox.core.Index
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Component
 import org.ta4j.core.BaseTick
-import org.ta4j.core.Decimal
+import org.ta4j.core.Tick
 import org.ta4j.core.TimeSeries
-import org.ta4j.core.indicators.EMAIndicator
-import org.ta4j.core.indicators.SMAIndicator
-import org.ta4j.core.indicators.helpers.ClosePriceIndicator
 import java.time.Duration
-import java.time.Instant
 import java.time.ZoneId
-import javax.annotation.PostConstruct
+import java.time.temporal.ChronoUnit
 import javax.websocket.*
 
 private val logger = KotlinLogging.logger {}
 
 @ClientEndpoint
 @Component
-class Feed @Autowired constructor(val timeSeries: TimeSeries, val tickRepository: TickRepository, val objectMapper: ObjectMapper, val engine: EPServiceProvider) {
+class Feed @Autowired constructor(val timeSeries: TimeSeries, val jestClient: JestClient, val objectMapper: ObjectMapper) {
     var session: Session? = null
 
     val gson = Gson()
 
     val snapshots: MutableMap<String, Snapshot> = mutableMapOf()
 
-    @PostConstruct
-    fun postConstruct() {
-        engine.epAdministrator.createEPL("select current_timestamp().roundFloor('min') as endtime, first(price) as open, max(price) as high, min(price) as low, last(price) as close, sum(m.size) as volume FROM Match#time_batch(1 min, 0L) m full outer join Tick#time_batch(1 min, 0L) t").addListener { newEvents, oldEvents ->
-            timeSeries.addTick(BaseTick(
-              Duration.ofSeconds(1),
-              Instant.ofEpochMilli(newEvents.first().get("endtime") as Long).atZone(ZoneId.systemDefault()),
-              Decimal.valueOf(newEvents.firstOrNull()?.get("open") as Double),
-              Decimal.valueOf(newEvents.firstOrNull()?.get("high") as Double),
-              Decimal.valueOf(newEvents.firstOrNull()?.get("low") as Double),
-              Decimal.valueOf(newEvents.firstOrNull()?.get("close") as Double),
-              Decimal.valueOf(newEvents.firstOrNull()?.get("volume") as Double)
-            ))
-
-            val smaIndicator = SMAIndicator(ClosePriceIndicator(timeSeries), 12).getValue(timeSeries.endIndex)
-            val emaIndicator = EMAIndicator(ClosePriceIndicator(timeSeries), 12).getValue(timeSeries.endIndex)
-            logger.debug { "sma: ${smaIndicator}, ema: ${emaIndicator}" }
-
-            logger.debug { "o: ${newEvents.firstOrNull()?.get("open")}, h: ${newEvents.firstOrNull()?.get("high")}, l: ${newEvents.firstOrNull()?.get("low")}, c: ${newEvents.firstOrNull()?.get("close")}, v: ${newEvents.firstOrNull()?.get("volume")}" }
-        }
-    }
-
     @OnOpen
     fun onOpen(session: Session) {
         this.session = session
         logger.debug { "Session Opened" }
 
+        snapshots.clear()
         session.basicRemote.sendText(objectMapper.writeValueAsString(SubscriptionRequest(channels = listOf(
           HeartbeatChannel(listOf("BTC-USD")),
           TickerChannel(listOf("BTC-USD")),
@@ -71,36 +47,6 @@ class Feed @Autowired constructor(val timeSeries: TimeSeries, val tickRepository
 
         parseMessage(message)?.let { messageObject ->
             when (messageObject.getAsJsonPrimitive("type").asString) {
-                "heartbeat" -> {
-                    /*
-                    {
-                        "type": "heartbeat",
-                        "sequence": 90,
-                        "last_trade_id": 20,
-                        "product_id": "BTC-USD",
-                        "time": "2014-11-07T08:19:28.464459Z"
-                    }
-                    */
-                    updateHeartbeat(objectMapper.readValue(message, Heartbeat::class.java))
-                }
-                "ticker" -> {
-                    /*
-                    {
-                        "type":"ticker",
-                        "sequence":4415702206,
-                        "product_id":"BTC-USD",
-                        "price":"8222.49000000",
-                        "open_24h":"8080.01000000",
-                        "volume_24h":"14479.48570789",
-                        "low_24h":"8222.49000000",
-                        "high_24h":"8324.00000000",
-                        "volume_30d":"636853.61832642",
-                        "best_bid":"8222.48",
-                        "best_ask":"8222.49"
-                     }
-                     */
-                    updateTicker(objectMapper.readValue(message, Tick::class.java))
-                }
                 "match" -> {
                     /*
                     {
@@ -126,7 +72,51 @@ class Feed @Autowired constructor(val timeSeries: TimeSeries, val tickRepository
     }
 
     private fun updateMatch(match: Match) {
-        engine.epRuntime.sendEvent(match)
+        if (timeSeries.tickCount == 0) {
+            timeSeries.addTick(createTick(match))
+        }
+
+        var tick = timeSeries.lastTick
+        if (match.time.isAfter(tick.endTime.toInstant())) {
+            if (timeSeries.tickCount > 1) {
+                saveTick(tick)
+            }
+            logger.debug { "${tick.beginTime} (${tick.trades}) - (o:${tick.openPrice} l:${tick.minPrice} h:${tick.maxPrice} c:${tick.closePrice} v:${tick.volume})" }
+            tick = createTick(match)
+            timeSeries.addTick(tick)
+        }
+
+        tick.addTrade(match.size, match.price)
+    }
+
+    private fun saveTick(tick: Tick) {
+        val source = JsonObject().apply {
+            addProperty("time", tick.beginTime.toInstant().toEpochMilli())
+            addProperty("open", tick.openPrice.toDouble())
+            addProperty("low", tick.minPrice.toDouble())
+            addProperty("high", tick.maxPrice.toDouble())
+            addProperty("close", tick.closePrice.toDouble())
+            addProperty("volume", tick.volume.toDouble())
+            addProperty("trades", tick.trades)
+            addProperty("amount", tick.amount.toDouble())
+        }
+
+        val result = jestClient.execute(
+          Index.Builder(source)
+            .index("tradr")
+            .type("tick")
+            .id(tick.beginTime.toInstant().toEpochMilli().toString())
+            .build()
+        )
+    }
+
+    private fun createTick(match: Match): Tick {
+        val endTime = match.time.atZone(ZoneId.systemDefault())
+
+        return BaseTick(
+          Duration.ofMinutes(1),
+          endTime.plusMinutes(1).truncatedTo(ChronoUnit.MINUTES)
+        )
     }
 
     private fun updateSnapshot(message: JsonObject) {
@@ -207,16 +197,7 @@ class Feed @Autowired constructor(val timeSeries: TimeSeries, val tickRepository
         this.snapshots.put(product, snapshot)
     }
 
-    private fun updateTicker(tick: Tick) {
-        engine.epRuntime.sendEvent(tick)
-    }
-
     private fun parseMessage(message: String) = gson.fromJson(message, JsonObject::class.java)
-
-    private fun updateHeartbeat(heartbeat: Heartbeat) {
-        engine.epRuntime.sendEvent(heartbeat)
-        engine.epRuntime.sendEvent(CurrentTimeEvent(heartbeat.time.toEpochMilli()))
-    }
 
     @OnError
     fun onError(session: Session, t: Throwable) {

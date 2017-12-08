@@ -45,6 +45,7 @@ dependencies {
 	compile('com.fasterxml.jackson.module:jackson-module-kotlin')
 	compile('com.fasterxml.jackson.datatype:jackson-datatype-jdk8')
 	compile('com.fasterxml.jackson.datatype:jackson-datatype-jsr310')
+	compile('org.apache.commons:commons-csv:1.5')
 
 //	compile("org.apache.camel:camel-quickfix-starter:${camelVersion}")
 	compile('org.springframework.boot:spring-boot-starter-actuator')
@@ -59,6 +60,7 @@ dependencies {
 	compile('org.springframework.boot:spring-boot-starter-web')
 	compile('org.springframework.boot:spring-boot-starter-websocket')
 	compile('org.springframework.data:spring-data-elasticsearch')
+	compile('io.searchbox:jest:5.3.3')
 	compile("org.jetbrains.kotlin:kotlin-stdlib-jre8:${kotlinVersion}")
 	compile("org.jetbrains.kotlin:kotlin-reflect:${kotlinVersion}")
 	runtime('com.h2database:h2')
@@ -66,4 +68,8 @@ dependencies {
 	testCompile('org.springframework.boot:spring-boot-starter-test')
 	testCompile('org.springframework.restdocs:spring-restdocs-mockmvc')
 	testCompile('org.springframework.security:spring-security-test')
+}
+
+bootRun {
+	addResources = true
 }

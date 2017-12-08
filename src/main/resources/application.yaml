@@ -13,11 +13,21 @@ spring:
     property-naming-strategy: SNAKE_CASE
     default-property-inclusion: non_null
     serialization: {
+      WRITE_DATES_AS_TIMESTAMPS: true,
+      WRITE_DATE_TIMESTAMPS_AS_NANOSECONDS: false,
       WRITE_NULL_MAP_VALUES: false
     }
+  thymeleaf:
+    cache: false
+  elasticsearch:
+    jest:
+      connection-timeout: 120000
+      read-timeout: 120000
 
 logging:
   level:
     root: info
     net.swigg.tradr: debug
+    org.elasticsearch.cluster: error
 #    sun: warn
+#    org.elasticsearch.cluster.routing.allocation.decier: error
